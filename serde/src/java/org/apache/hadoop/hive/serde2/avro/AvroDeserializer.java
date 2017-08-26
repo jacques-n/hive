@@ -41,6 +41,7 @@ import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.EncoderFactory;
+import org.apache.avro.util.Utf8;
 import org.apache.avro.UnresolvedUnionException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -225,7 +226,11 @@ class AvroDeserializer {
       PrimitiveTypeInfo columnType) throws AvroSerdeException {
     switch (columnType.getPrimitiveCategory()){
     case STRING:
-      return datum.toString(); // To workaround AvroUTF8
+      if(datum instanceof Utf8) {
+        return datum;
+      } else {
+        return datum.toString(); // To workaround AvroUTF8
+      }
       // This also gets us around the Enum issue since we just take the value
       // and convert it to a string. Yay!
     case BINARY:
