@@ -63,15 +63,17 @@ import org.apache.hadoop.io.Writable;
 
 class AvroDeserializer {
   private static final Log LOG = LogFactory.getLog(AvroDeserializer.class);
+
+  private final boolean skipUtf8ToStringConversion = Boolean.getBoolean("dremio.hive.avro.stringToUtf8");
   /**
    * Set of already seen and valid record readers IDs which doesn't need re-encoding
    */
-  private final HashSet<UID> noEncodingNeeded = new HashSet<UID>();
+  private final HashSet<UID> noEncodingNeeded = new HashSet<>();
   /**
    * Map of record reader ID and the associated re-encoder. It contains only the record readers
    *  that record needs to be re-encoded.
    */
-  private final HashMap<UID, SchemaReEncoder> reEncoderCache = new HashMap<UID, SchemaReEncoder>();
+  private final HashMap<UID, SchemaReEncoder> reEncoderCache = new HashMap<>();
   /**
    * Flag to print the re-encoding warning message only once. Avoid excessive logging for each
    * record encoding.
@@ -88,13 +90,13 @@ class AvroDeserializer {
    */
   static class SchemaReEncoder {
     private final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    private final GenericDatumWriter<GenericRecord> gdw = new GenericDatumWriter<GenericRecord>();
+    private final GenericDatumWriter<GenericRecord> gdw = new GenericDatumWriter<>();
     private BinaryDecoder binaryDecoder = null;
 
     GenericDatumReader<GenericRecord> gdr = null;
 
     public SchemaReEncoder(Schema writer, Schema reader) {
-      gdr = new GenericDatumReader<GenericRecord>(writer, reader);
+      gdr = new GenericDatumReader<>(writer, reader);
     }
 
     public GenericRecord reencode(GenericRecord r)
@@ -141,7 +143,7 @@ class AvroDeserializer {
     }
 
     if(row == null || row.size() != columnNames.size()) {
-      row = new ArrayList<Object>(columnNames.size());
+      row = new ArrayList<>(columnNames.size());
     } else {
       row.clear();
     }
@@ -226,7 +228,7 @@ class AvroDeserializer {
       PrimitiveTypeInfo columnType) throws AvroSerdeException {
     switch (columnType.getPrimitiveCategory()){
     case STRING:
-      if(datum instanceof Utf8) {
+      if(datum instanceof Utf8 && skipUtf8ToStringConversion) {
         return datum;
       } else {
         return datum.toString(); // To workaround AvroUTF8
@@ -357,7 +359,7 @@ class AvroDeserializer {
     // No equivalent Java type for the backing structure, need to recurse and build a list
     ArrayList<TypeInfo> innerFieldTypes = columnType.getAllStructFieldTypeInfos();
     ArrayList<String> innerFieldNames = columnType.getAllStructFieldNames();
-    List<Object> innerObjectRow = new ArrayList<Object>(innerFieldTypes.size());
+    List<Object> innerObjectRow = new ArrayList<>(innerFieldTypes.size());
 
     return workerBase(innerObjectRow, fileSchema, innerFieldNames, innerFieldTypes, datum);
   }
@@ -377,7 +379,7 @@ class AvroDeserializer {
     // We're faking out Hive to work through a type system impedence mismatch.
     // Pull out the backing array and convert to a list.
       GenericData.Fixed fixed = (GenericData.Fixed) datum;
-      List<Byte> asList = new ArrayList<Byte>(fixed.bytes().length);
+      List<Byte> asList = new ArrayList<>(fixed.bytes().length);
       for(int j = 0; j < fixed.bytes().length; j++) {
         asList.add(fixed.bytes()[j]);
       }
@@ -385,7 +387,7 @@ class AvroDeserializer {
     } else if(recordSchema.getType().equals(Schema.Type.BYTES)) {
       // This is going to be slow... hold on.
       ByteBuffer bb = (ByteBuffer)datum;
-      List<Byte> asList = new ArrayList<Byte>(bb.capacity());
+      List<Byte> asList = new ArrayList<>(bb.capacity());
       byte[] array = bb.array();
       for(int j = 0; j < array.length; j++) {
         asList.add(array[j]);
@@ -394,7 +396,7 @@ class AvroDeserializer {
     } else { // An actual list, deser its values
       List listData = (List) datum;
       Schema listSchema = recordSchema.getElementType();
-      List<Object> listContents = new ArrayList<Object>(listData.size());
+      List<Object> listContents = new ArrayList<>(listData.size());
       for(Object obj : listData) {
         listContents.add(worker(obj, fileSchema == null ? null : fileSchema.getElementType(), listSchema,
             columnType.getListElementTypeInfo()));
@@ -407,7 +409,7 @@ class AvroDeserializer {
           throws AvroSerdeException {
     // Avro only allows maps with Strings for keys, so we only have to worry
     // about deserializing the values
-    Map<String, Object> map = new HashMap<String, Object>();
+    Map<String, Object> map = new HashMap<>();
     Map<CharSequence, Object> mapDatum = (Map)datum;
     Schema valueSchema = mapSchema.getValueType();
     TypeInfo valueTypeInfo = columnType.getMapValueTypeInfo();
